@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 import progressbar
 from pyunpack import Archive
-
+import timeit
 
 pbar = None
 
@@ -20,11 +20,10 @@ DOWNLOAD_DIR = os.path.join((os.environ['USERPROFILE']), r'Desktop\Downloaded-SF
 
 
 def browser_setup():
-
     fp = webdriver.FirefoxProfile()
 
     options = FirefoxOptions()
-    #options.headless = True
+    options.headless = True
     caps = DesiredCapabilities().FIREFOX
     caps["marionette"] = True
     driver = webdriver.Firefox(firefox_profile=fp, capabilities=caps, executable_path=GeckoDriverManager().install(),
@@ -80,14 +79,14 @@ def download_url(url, output_dir, filename=None):
 
 
 def get_top_projects(driver, quantity):
-    url = fr"https://sourceforge.net/directory/os:windows/?page=1&sort=rating"
+    url = fr"https://sourceforge.net/directory/os:windows/?page=1&sort=popular"
     driver.get(url)
     sleep(5)
     cookie = driver.find_element(By.CLASS_NAME, "cmpboxbtn")
     if cookie is not None:
         cookie.click()
     only_links = set()
-    while len(only_links) < quantity+10:
+    while len(only_links) < quantity + 25:
         for link in driver.find_elements(By.CLASS_NAME, "see-project"):
             only_links.add(link.get_attribute("href"))
         next_page = driver.find_element(By.CSS_SELECTOR, "[aria-label='Next page']")
@@ -104,6 +103,9 @@ def clean_text(rgx_list, text):
 
 
 def get_link_name(links, driver, quantity):
+    extensions = (
+        '.acm', '.ax', '.cpl', '.dll', '.drv', '.efi', '.exe', '.mui', '.ocx', '.scr', '.sys', '.tsp', '.zip', '.tar',
+        '.jar', '.gztar', '.bztar', '.xztar', '.gz', '7z')
     items = list()
     for link in links:
         link_and_name = list()
@@ -114,22 +116,22 @@ def get_link_name(links, driver, quantity):
             link = download_button.get_attribute("href")
             name = download_button.get_attribute("title")
             name = clean_text(['^(Download\s)', '(\sfrom SourceForge\s*.\s\d+.\d+\s[a-zA-Z]+)$'], name)
-            link_and_name.append(link)
-            link_and_name.append(name)
-            items.append(link_and_name)
+            if name.endswith(extensions):
+                link_and_name.append(link)
+                link_and_name.append(name)
+                items.append(link_and_name)
         except:
             continue
     return items[:quantity]
 
 
 def scrape():
-    sleep(5)
     driver = browser_setup()
     try:
-        links = get_top_projects(driver, 25)
-        links_names = get_link_name(links, driver, 25)
+        links = get_top_projects(driver, 100)
+        links_names = get_link_name(links, driver, 100)
         for i in links_names:
-            download_url(i[0], 'DOWNLOAD_DIR', i[1])
+            download_url(i[0], DOWNLOAD_DIR, i[1])
     except Exception as e:
         print(e)
     finally:
@@ -163,8 +165,8 @@ def rename_sha1(download):
     folder = os.path.join(download, 'top100')
     if not os.path.exists(folder):
         os.makedirs(folder, exist_ok=True)
-    pe_extensions = (".acm", ".ax", ".cpl", ".dll", ".drv", ".efi", ".exe", ".mui", ".ocx", ".scr", ".sys", ".tsp")
-    archive_extensions = ('.zip', '.tar', '.gztar', '.bztar', '.xztar', '.gz', '7z')
+    pe_extensions = ('.acm', '.ax', '.cpl', '.dll', '.drv', '.efi', '.exe', '.mui', '.ocx', '.scr', '.sys', '.tsp')
+    archive_extensions = ('.zip', '.tar', '.gztar', '.bztar', '.xztar', '.gz', '7z', '.jar')
     for file in glob.iglob(f'{download}/*'):
         name = os.path.basename(file).split('.')[0]
 
@@ -176,22 +178,32 @@ def rename_sha1(download):
             temp_folder = os.path.join(download, name)
             if not os.path.exists(temp_folder):
                 os.makedirs(temp_folder, exist_ok=True)
-            Archive(file).extractall(temp_folder)
+            try:
+                Archive(file).extractall(temp_folder)
+            except Exception as e:
+                print(f"Can't extract {file} because:\n{e}")
             found = walkfs(temp_folder, pe_extensions)
             if found:
                 hashed = get_hash(found, folder)
                 all_files.append(hashed)
             else:
-                print("Portable Executable Not Found")
+                print(f"Portable Executable Not Found in {temp_folder}")
+
+        else:
+            name = os.path.basename(file)
+            print(f"Don't know what to do with file {name}")
+
 
 def seven_zip(files):
     pass
 
 
 def main():
-    # scrape()
-    # name = None
-    rename_sha1('DOWNLOAD_DIR')
+    start = timeit.timeit()
+    scrape()
+    end = timeit.timeit()
+    print(end - start)
+    rename_sha1(DOWNLOAD_DIR)
     # files = None
     # seven_zip(files)
 
