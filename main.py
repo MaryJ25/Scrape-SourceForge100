@@ -20,6 +20,10 @@ DOWNLOAD_DIR = os.path.join((os.environ['USERPROFILE']), r'Desktop\Downloaded-SF
 
 
 def browser_setup():
+    """
+    Sets up Selenium to use Firefox and all the needed options for it
+    :return: selenium driver to scrape with
+    """
     fp = webdriver.FirefoxProfile()
 
     options = FirefoxOptions()
@@ -32,6 +36,11 @@ def browser_setup():
 
 
 def show_progress(block_num, block_size, total_size):
+    """
+    Makes the progress bar shown when downloading files. All params are set up by the hook in urllib.request.urlretrieve
+     in download_url function.
+    :return: None
+    """
     global pbar
     if pbar is None:
         pbar = progressbar.ProgressBar(maxval=total_size)
@@ -45,12 +54,13 @@ def show_progress(block_num, block_size, total_size):
         pbar = None
 
 
-def download_url(url, output_dir, filename=None):
-    """Download a file and place it in a given directory.
-    Args:
-        url (str): URL to download file from
-        output_dir (str): Directory to place downloaded file in
-        filename (str, optional): Name to save the file under. If None, use the basename of the URL
+def download_url(url: str, output_dir: str, filename: str = None):
+    """
+    Download a file and place it in a given directory.
+    :param url: (str) URL to download file from
+    :param output_dir: (str) Directory to place downloaded file in
+    :param filename: (str, optional) Name to save the file under. If None, use the basename of the URL
+    :return: Path to the downloaded file
     """
     if not filename:
         filename = url.split('/')[-4]
@@ -78,7 +88,13 @@ def download_url(url, output_dir, filename=None):
         return fpath
 
 
-def get_top_projects(driver, quantity):
+def get_top_projects(driver, quantity: int):
+    """
+    Goes to SourceForge filters to only windows suitable software. Gets the links to the given number of projects +25
+    :param driver: Set up selenium driver
+    :param quantity: (int) Has to be an increment of 25 (number of projects per page)
+    :return: List of links to all scraped projects
+    """
     url = fr"https://sourceforge.net/directory/os:windows/?page=1&sort=popular"
     driver.get(url)
     sleep(5)
@@ -95,14 +111,28 @@ def get_top_projects(driver, quantity):
     return only_links
 
 
-def clean_text(rgx_list, text):
+def clean_text(rgx_list: list, text: str):
+    """
+    Cleans up a given string by removing all matching regex patterns
+    :param rgx_list: list of regex patterns to remove
+    :param text: string that needs to be cleand
+    :return: String with all matching regex removed
+    """
     new_text = text
     for rgx_match in rgx_list:
         new_text = re.sub(rgx_match, '', new_text)
     return new_text
 
 
-def get_link_name(links, driver, quantity):
+def get_link_name(driver, links: list, quantity: int):
+    """
+    Gets the download link and the filename that's downloaded.
+    If the filename doesn't have an acceptable extension it is ignored as it can't be used.
+    :param links: a list of project links to loop through
+    :param driver: Selenium driver
+    :param quantity: (int) number of links that need to be returned
+    :return: A list of lists. Each smaller list contains project download link and name
+    """
     extensions = (
         '.acm', '.ax', '.cpl', '.dll', '.drv', '.efi', '.exe', '.mui', '.ocx', '.scr', '.sys', '.tsp', '.zip', '.tar',
         '.jar', '.gztar', '.bztar', '.xztar', '.gz', '7z')
@@ -125,20 +155,13 @@ def get_link_name(links, driver, quantity):
     return items[:quantity]
 
 
-def scrape():
-    driver = browser_setup()
-    try:
-        links = get_top_projects(driver, 100)
-        links_names = get_link_name(links, driver, 100)
-        for i in links_names:
-            download_url(i[0], DOWNLOAD_DIR, i[1])
-    except Exception as e:
-        print(e)
-    finally:
-        driver.quit()
-
-
-def get_hash(fpath, out_dir):
+def get_hash(fpath: str, out_dir: str):
+    """
+    Renames files with their sha1 hash names.
+    :param fpath: path to the file that needs to be renamed
+    :param out_dir: directory where the file should be stored
+    :return: hash name of the file
+    """
     f = open(fpath, 'rb')
     hash_name = hashlib.sha1(f.read()).hexdigest()
     f.close()
@@ -151,6 +174,12 @@ def get_hash(fpath, out_dir):
 
 
 def walkfs(startdir, findfile):
+    """
+    Goes through a given directory looking for file with matching extensions.
+    :param startdir: (str) Directory where to look for the files
+    :param findfile: tuple of accepted extensions
+    :return: if file found path to the file else None
+    """
     for root, dirs, files in os.walk(startdir):
         for file in files:
             if file.endswith(findfile):
@@ -160,22 +189,46 @@ def walkfs(startdir, findfile):
     return None
 
 
-def rename_sha1(download):
+def scrape():
+    """
+    Sets up the driver, if connection is established will get the links to top projects,
+    then uses those links to get the download links and filenames. Finally, loops through the projects and downloads
+    them to a specified directory.
+    :return: None
+    """
+    driver = browser_setup()
+    try:
+        links = get_top_projects(driver, 100)
+        links_names = get_link_name(driver, links, 100)
+        for i in links_names:
+            download_url(i[0], DOWNLOAD_DIR, i[1])
+    except Exception as e:
+        print(e)
+    finally:
+        driver.quit()
+
+
+def rename_sha1(file_dir):
+    """
+    Goes through all files in a given directory and decides what to do with them based on their extensions
+    :param file_dir: directory where to be searched
+    :return: Path to folder that contains all files renamed to their hash names
+    """
     all_files = list()
-    folder = os.path.join(download, 'top100')
+    folder = os.path.join(file_dir, 'top100')
     if not os.path.exists(folder):
         os.makedirs(folder, exist_ok=True)
     pe_extensions = ('.acm', '.ax', '.cpl', '.dll', '.drv', '.efi', '.exe', '.mui', '.ocx', '.scr', '.sys', '.tsp')
     archive_extensions = ('.zip', '.tar', '.gztar', '.bztar', '.xztar', '.gz', '7z', '.jar')
-    for file in glob.iglob(f'{download}/*'):
+    for file in glob.iglob(f'{file_dir}/*'):
         name = os.path.basename(file).split('.')[0]
-
+        # if file has a portable executable extension it's path is passed to the hash function
         if file.endswith(pe_extensions):
             hashed = get_hash(file, folder)
             all_files.append(hashed)
-
+        # if a file has an archive extension the files are extracted and then searched for a windows PE file
         elif file.endswith(archive_extensions):
-            temp_folder = os.path.join(download, name)
+            temp_folder = os.path.join(file_dir, name)
             if not os.path.exists(temp_folder):
                 os.makedirs(temp_folder, exist_ok=True)
             try:
@@ -191,8 +244,8 @@ def rename_sha1(download):
 
         else:
             name = os.path.basename(file)
-            print(f"Don't know what to do with file {name}")
-
+            print(f"{name} is neither an archive nor a portable executable or is missing an extension.")
+    return folder
 
 def seven_zip(files):
     pass
