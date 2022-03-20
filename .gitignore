@@ -114,3 +114,4 @@ dmypy.json
 .pyre/
 
 DOWNLOAD_DIR/
+test.py
