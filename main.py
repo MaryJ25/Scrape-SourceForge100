@@ -7,12 +7,13 @@ import os
 import re
 import glob
 import hashlib
-from time import sleep
+import subprocess
+from time import sleep, time
 import urllib.error
 import urllib.request
 import progressbar
 from pyunpack import Archive
-import timeit
+from pywinauto.application import Application
 
 pbar = None
 
@@ -97,6 +98,7 @@ def get_top_projects(driver, quantity: int):
     """
     url = fr"https://sourceforge.net/directory/os:windows/?page=1&sort=popular"
     driver.get(url)
+    print("Getting top projects!")
     sleep(5)
     cookie = driver.find_element(By.CLASS_NAME, "cmpboxbtn")
     if cookie is not None:
@@ -107,6 +109,7 @@ def get_top_projects(driver, quantity: int):
             only_links.add(link.get_attribute("href"))
         next_page = driver.find_element(By.CSS_SELECTOR, "[aria-label='Next page']")
         next_page.click()
+        print("Going to next page")
     only_links = list(only_links)
     return only_links
 
@@ -200,7 +203,9 @@ def scrape():
     try:
         links = get_top_projects(driver, 100)
         links_names = get_link_name(driver, links, 100)
+        count = 1
         for i in links_names:
+            print(f'Downloading file {count}/{len(links_names)}')
             download_url(i[0], DOWNLOAD_DIR, i[1])
     except Exception as e:
         print(e)
@@ -247,19 +252,36 @@ def rename_sha1(file_dir):
             print(f"{name} is neither an archive nor a portable executable or is missing an extension.")
     return folder
 
-def seven_zip(files):
-    pass
+
+def seven_zip(top_folder):
+    path_zip = r'C:\Program Files\7-Zip\7zFM.exe'
+    if os.path.exists(path_zip):
+        app = Application().start(path_zip)
+    else:
+        path_zip = input('Please provide the path to 7z executable. \n')
+        app = Application().start(path_zip)
+    seven_dlg = app.top_window()
+    seven_dlg.Edit.type_keys(fr"{top_folder}{{ENTER}}")
+    seven_dlg.menu_select('Edit->Select All')
+    seven_dlg.ToolbarAdd.click()
+    app2 = Application().connect(path='7zG.exe', title='Add to Archive')
+    archive = app2.top_window()
+    archive.OK.click()
+    progress = app2.top_window()
+    progress.wait_not('visible')
+    seven_dlg.menu_select('File->Exit')
+    print(f"All Done!\nFind the archive in {top_folder}")
+    return top_folder
 
 
 def main():
-    start = timeit.timeit()
+    start = time()
     scrape()
-    end = timeit.timeit()
-    print(end - start)
-    rename_sha1(DOWNLOAD_DIR)
-    # files = None
-    # seven_zip(files)
-
+    end = time()
+    print(f'Downloading everything took {end - start}')
+    folder = rename_sha1(DOWNLOAD_DIR)
+    top = seven_zip(folder)
+    subprocess.Popen(fr'explorer {top}')
 
 if __name__ == "__main__":
     main()
