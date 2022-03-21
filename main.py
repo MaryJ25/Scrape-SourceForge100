@@ -95,7 +95,7 @@ def get_top_projects(driver, quantity: int):
     :param quantity: (int) Has to be an increment of 25 (number of projects per page)
     :return: List of links to all scraped projects
     """
-    url = fr"https://sourceforge.net/directory/os:windows/?page=1&sort=popular"
+    url = r"https://sourceforge.net/directory/os:windows/?page=1&sort=popular"
     driver.get(url)
     print("Getting top projects!")
     sleep(5)
