@@ -7,7 +7,6 @@ import os
 import re
 import glob
 import hashlib
-import subprocess
 from time import sleep, time
 import urllib.error
 import urllib.request
@@ -57,7 +56,7 @@ def show_progress(block_num, block_size, total_size):
 
 def download_url(url: str, output_dir: str, filename: str = None):
     """
-    Download a file and place it in a given directory.
+    Download a file and place it in a given directory
     :param url: (str) URL to download file from
     :param output_dir: (str) Directory to place downloaded file in
     :param filename: (str, optional) Name to save the file under. If None, use the basename of the URL
@@ -178,7 +177,7 @@ def get_hash(fpath: str, out_dir: str):
 
 def walkfs(startdir, findfile):
     """
-    Goes through a given directory looking for file with matching extensions.
+    Goes through a given directory looking for file with matching extensions
     :param startdir: (str) Directory where to look for the files
     :param findfile: tuple of accepted extensions
     :return: if file found path to the file else None
@@ -192,7 +191,7 @@ def walkfs(startdir, findfile):
     return None
 
 
-def scrape():
+def scrape(quantity):
     """
     Sets up the driver, if connection is established will get the links to top projects,
     then uses those links to get the download links and filenames. Finally, loops through the projects and downloads
@@ -201,12 +200,13 @@ def scrape():
     """
     driver = browser_setup()
     try:
-        links = get_top_projects(driver, 100)
-        links_names = get_link_name(driver, links, 100)
+        links = get_top_projects(driver, quantity)
+        links_names = get_link_name(driver, links, quantity)
         count = 1
         for i in links_names:
             print(f'Downloading file {count}/{len(links_names)}')
             download_url(i[0], DOWNLOAD_DIR, i[1])
+            count += 1
     except Exception as e:
         print(e)
     finally:
@@ -253,7 +253,12 @@ def rename_sha1(file_dir):
     return folder
 
 
-def seven_zip(top_folder):
+def seven_zip(top_folder: str):
+    """
+    Opens up 7z GUI and archives the files in given folder
+    :param top_folder: (str) path to the folder that needs to be archived
+    :return: (str) returns the same path
+    """
     path_zip = r'C:\Program Files\7-Zip\7zFM.exe'
     if os.path.exists(path_zip):
         app = Application().start(path_zip)
@@ -268,20 +273,22 @@ def seven_zip(top_folder):
     archive = app2.top_window()
     archive.OK.click()
     progress = app2.top_window()
-    progress.wait_not('visible')
+    progress.Background.click()
     seven_dlg.menu_select('File->Exit')
-    print(f"All Done!\nFind the archive in {top_folder}")
+    sleep(30)
+    print(f"Once the archive is complete find it in {top_folder}")
     return top_folder
 
 
 def main():
     start = time()
-    scrape()
+    scrape(100)
     end = time()
-    print(f'Downloading everything took {end - start}')
+    print(f'Downloading everything took {(end - start)/60}min')
     folder = rename_sha1(DOWNLOAD_DIR)
     top = seven_zip(folder)
-    subprocess.Popen(fr'explorer {top}')
+    os.startfile(f'{top}')
+
 
 if __name__ == "__main__":
     main()
