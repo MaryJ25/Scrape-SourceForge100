@@ -1,5 +1,8 @@
 # Scrape Source Forge 100
 
+## Inspiration
+This code is a task done as part of my job application.
+
 ### The code here attempts to:
 1. Scrape the top 100 software by popularity from Source Forge
 2. Find and collect Windows PE files from the downloaded files
@@ -34,9 +37,15 @@ Finally, the code opens up 7z GUI (it attempts to look for it in program files i
 found requests the path to the executable). Selects the top100 directory and then makes
 it into an archive and opens up the directory where the archive is.
 
-## Potential errors
+### Potential errors
 - If for whatever reason the code won't be able to connect to selenium driver it will
 throw a timeout error
 - If connection is lost while downloading the code will either throw an error or get stuck.
 Safeguarding for this - when the code is restarted and tries downloading again, it will pass
-the links that have been downloaded before (as long as the directory is the same). 
+the links that have been downloaded before (as long as the directory is the same).
+
+## How to run
+Run the `main.py` file and all functions will be executed in the order they need to be.
+
+## License
+Distributed under the MIT License. See `LICENSE` for more information.
